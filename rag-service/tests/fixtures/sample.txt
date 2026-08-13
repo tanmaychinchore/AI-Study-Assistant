@@ -1,0 +1,15 @@
+This is a sample text file for testing the TXT loader.
+
+It contains multiple paragraphs to verify that the extraction
+preserves the full content.
+
+Key Concepts:
+- Concept 1: Process scheduling determines which process runs next.
+- Concept 2: Deadlock occurs when processes wait for each other indefinitely.
+- Concept 3: Virtual memory allows processes to use more memory than physically available.
+
+Important Definitions:
+A process is an instance of a program in execution.
+A thread is a lightweight subprocess within a process.
+
+This file is used by the automated test suite.
