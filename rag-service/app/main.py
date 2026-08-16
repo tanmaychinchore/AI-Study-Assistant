@@ -48,11 +48,32 @@ async def lifespan(app: FastAPI):
         )
         app.state.embedding_service = None
 
+    # --- Initialize Astra DB ---
+    from app.services.astra_db_service import AstraDBService
+
+    try:
+        astra_service = AstraDBService()
+        if astra_service.is_configured:
+            astra_service.connect()
+            astra_service.initialize_collection()
+            app.state.astra_db_service = astra_service
+            logger.info("Astra DB service ready: keyspace=%s collection=%s", astra_service.keyspace, astra_service.collection_name)
+        else:
+            app.state.astra_db_service = astra_service
+            logger.info("Astra DB service not configured (missing credentials in .env)")
+    except Exception as exc:
+        logger.warning(
+            "Astra DB initialization failed: %s — vector storage endpoints will be unavailable",
+            exc,
+        )
+        app.state.astra_db_service = None
+
     yield  # App is running
 
     logger.info("Shutting down %s …", settings.APP_NAME)
-    # Release model resources
+    # Release model and DB resources
     app.state.embedding_service = None
+    app.state.astra_db_service = None
 
 
 # ---------------------------------------------------------------------------
