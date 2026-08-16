@@ -10,7 +10,7 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 
 from app.core.logging import get_logger
 from app.schemas.document import (
@@ -294,4 +294,107 @@ async def process_and_chunk_document(
     finally:
         if tmp_dir:
             shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------
+# POST /documents/index — complete 5-stage indexing pipeline (Task 6)
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/index",
+    response_model=SuccessResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid file or request"},
+        413: {"model": ErrorResponse, "description": "File too large"},
+        500: {"model": ErrorResponse, "description": "Indexing failed"},
+        503: {"model": ErrorResponse, "description": "Embedding or Astra DB service unavailable"},
+    },
+    summary="Complete document indexing pipeline",
+    description=(
+        "Full 5-stage ingestion pipeline: Upload → Validate → Extract → Clean → "
+        "Chunk → BGE-M3 (1024-dim) Embeddings → Astra DB Vector Storage. "
+        "Returns complete indexing statistics, vector counts, and chunk previews."
+    ),
+)
+async def index_document_endpoint(
+    request: Request,
+    file: UploadFile = File(..., description="The document file to index."),
+    user_id: str = Form(..., description="Owning user's ID."),
+    document_id: str = Form(default=None, description="Optional pre-generated document ID."),
+    subject: str = Form(default=None, description="Subject label."),
+    topic: str = Form(default=None, description="Topic label."),
+) -> SuccessResponse:
+    """Upload a document and execute the complete 5-stage indexing pipeline."""
+    contents, _ = await _validate_and_read_file(file)
+
+    # Check services availability
+    embedding_service = getattr(request.app.state, "embedding_service", None)
+    if embedding_service is None or not embedding_service.is_loaded:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Embedding model is not loaded. Service is starting up.",
+        )
+
+    astra_service = getattr(request.app.state, "astra_db_service", None)
+    if astra_service is None or not astra_service.is_ready:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Astra DB service is not connected or collection is not initialized. Please verify credentials in .env.",
+        )
+
+    tmp_dir = None
+    try:
+        tmp_dir = tempfile.mkdtemp(prefix="rag_indexing_")
+        tmp_path = Path(tmp_dir) / file.filename
+        tmp_path.write_bytes(contents)
+
+        logger.info(
+            "Indexing document: name=%s  size=%.1fKB  user=%s",
+            file.filename,
+            len(contents) / 1024,
+            user_id,
+        )
+
+        from app.services.indexing_service import index_document as run_index_pipeline
+
+        result = run_index_pipeline(
+            file_path=tmp_path,
+            user_id=user_id,
+            document_id=document_id or None,
+            subject=subject or None,
+            topic=topic or None,
+            embedding_service=embedding_service,
+            astra_service=astra_service,
+        )
+
+        return SuccessResponse(
+            message=(
+                f"Document '{file.filename}' successfully indexed into Astra DB "
+                f"({result.vectors_inserted} vector chunks stored)."
+            ),
+            data=result.model_dump(),
+        )
+
+    except ValueError as exc:
+        logger.warning("Validation error during indexing: %s", exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except FileNotFoundError as exc:
+        logger.error("File not found during indexing: %s", exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except RuntimeError as exc:
+        logger.error("Indexing pipeline failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Document indexing failed: {exc}",
+        )
+    except Exception as exc:
+        logger.exception("Unexpected error during document indexing")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred during document indexing: {exc}",
+        )
+    finally:
+        if tmp_dir:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
 

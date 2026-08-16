@@ -36,6 +36,7 @@ class ProcessingStatus(str, Enum):
     CHUNKING = "chunking"
     EMBEDDING = "embedding"
     INDEXING = "indexing"
+    INDEXED = "indexed"
     COMPLETED = "completed"
     FAILED = "failed"
 

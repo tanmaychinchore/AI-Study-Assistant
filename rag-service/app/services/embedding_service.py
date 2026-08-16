@@ -68,6 +68,21 @@ class EmbeddingService:
             self.expected_dimension,
         )
 
+    @property
+    def dimension(self) -> int:
+        """Return expected vector dimension."""
+        return self.expected_dimension
+
+    @property
+    def embedding_dimension(self) -> int:
+        """Return expected vector dimension."""
+        return self.expected_dimension
+
+    @property
+    def is_loaded(self) -> bool:
+        """Check if model is loaded and ready."""
+        return self._model_loaded
+
     # ------------------------------------------------------------------
     # Model lifecycle
     # ------------------------------------------------------------------
