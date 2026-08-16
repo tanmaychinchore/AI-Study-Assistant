@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     # --- Embedding ---
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
     EMBEDDING_DIMENSION: int = 1024
+    EMBEDDING_BATCH_SIZE: int = 32
+    EMBEDDING_DEVICE: str = "auto"  # auto | cpu | cuda
 
     # --- Chunking ---
     CHUNK_SIZE: int = 1000

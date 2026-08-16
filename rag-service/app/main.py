@@ -33,12 +33,26 @@ async def lifespan(app: FastAPI):
     logger.info("  Host        : %s:%s", settings.RAG_SERVICE_HOST, settings.RAG_SERVICE_PORT)
     logger.info("=" * 60)
 
-    # Future: pre-load embedding model, verify Astra DB connection, etc.
+    # --- Load embedding model ---
+    from app.services.embedding_service import EmbeddingService
+
+    try:
+        embedding_service = EmbeddingService()
+        embedding_service.load_model()
+        app.state.embedding_service = embedding_service
+        logger.info("Embedding service ready: %s", embedding_service.get_model_info())
+    except Exception as exc:
+        logger.warning(
+            "Embedding model failed to load: %s — embedding endpoints will be unavailable",
+            exc,
+        )
+        app.state.embedding_service = None
 
     yield  # App is running
 
     logger.info("Shutting down %s …", settings.APP_NAME)
-    # Future: release model resources, close DB connections, etc.
+    # Release model resources
+    app.state.embedding_service = None
 
 
 # ---------------------------------------------------------------------------

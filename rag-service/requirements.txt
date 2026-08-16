@@ -21,9 +21,8 @@ python-multipart==0.0.20
 # --- LangChain Text Splitting ---
 langchain-text-splitters==0.3.8
 
-# --- Embeddings (Task 4) ---
-# sentence-transformers==4.1.0
-# torch>=2.0.0
+# --- Embeddings ---
+sentence-transformers==4.1.0
 
 # --- Vector Store (Task 5) ---
 # astrapy==1.5.2
