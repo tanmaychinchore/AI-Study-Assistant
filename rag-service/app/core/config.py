@@ -5,6 +5,8 @@ All environment variables are loaded from the .env file and validated here.
 Provides a single source of truth for all configurable values across the service.
 """
 
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -55,6 +57,9 @@ class Settings(BaseSettings):
 
     # --- Retrieval ---
     TOP_K: int = 5
+    MIN_TOP_K: int = 1
+    MAX_TOP_K: int = 50
+    DEFAULT_SIMILARITY_THRESHOLD: Optional[float] = None
 
 
 # Singleton settings instance — import this everywhere

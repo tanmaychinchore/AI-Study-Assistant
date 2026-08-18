@@ -337,6 +337,152 @@ class AstraDBService:
         return result.deleted_count
 
     # ------------------------------------------------------------------
+    # Vector Search & Retrieval Operations
+    # ------------------------------------------------------------------
+
+    def vector_search(
+        self,
+        query_vector: list[float],
+        user_id: str,
+        top_k: int = 5,
+        document_id: Optional[str] = None,
+        subject: Optional[str] = None,
+        topic: Optional[str] = None,
+        similarity_threshold: Optional[float] = None,
+    ) -> tuple[list[dict], float, int]:
+        """
+        Perform vector similarity search against Astra DB with metadata filtering.
+
+        Parameters
+        ----------
+        query_vector : list[float]
+            1024-dimensional normalized query embedding.
+        user_id : str
+            Owner user ID (strictly enforced for user isolation).
+        top_k : int
+            Number of nearest chunks to retrieve.
+        document_id : Optional[str]
+            Filter by specific document ID.
+        subject : Optional[str]
+            Filter by subject tag.
+        topic : Optional[str]
+            Filter by topic tag.
+        similarity_threshold : Optional[float]
+            Minimum cosine similarity score cutoff.
+
+        Returns
+        -------
+        tuple[list[dict], float, int]
+            (ranked_chunks_dicts, search_time_ms, raw_chunks_retrieved_count)
+        """
+        if not self._collection_ready or self._collection is None:
+            raise RuntimeError("Astra DB collection is not initialized.")
+
+        if not query_vector:
+            raise ValueError("Query vector cannot be empty.")
+
+        if len(query_vector) != self.expected_dimension:
+            raise ValueError(
+                f"Query vector dimension {len(query_vector)} does not match "
+                f"expected dimension {self.expected_dimension}."
+            )
+
+        if not user_id or not user_id.strip():
+            raise ValueError("User ID cannot be empty or whitespace-only.")
+
+        # Build filter criteria enforcing user isolation
+        filter_dict: dict[str, Any] = {"user_id": user_id.strip()}
+        if document_id is not None and document_id.strip():
+            filter_dict["document_id"] = document_id.strip()
+        if subject is not None and subject.strip():
+            filter_dict["subject"] = subject.strip()
+        if topic is not None and topic.strip():
+            filter_dict["topic"] = topic.strip()
+
+        logger.info(
+            "Executing Astra DB vector search: user_id='%s'  top_k=%d  filters=%s",
+            user_id,
+            top_k,
+            filter_dict,
+        )
+
+        # Explicit projection excludes large $vector embeddings to save network bandwidth
+        projection = {
+            "_id": True,
+            "chunk_id": True,
+            "document_id": True,
+            "document_name": True,
+            "user_id": True,
+            "text": True,
+            "char_count": True,
+            "file_type": True,
+            "page_number": True,
+            "slide_number": True,
+            "slide_title": True,
+            "heading": True,
+            "subject": True,
+            "topic": True,
+            "chunk_index": True,
+            "source_type": True,
+        }
+
+        start_time = time.perf_counter()
+
+        # Step 1: Astra DB retrieves top_k nearest candidate chunks
+        cursor = self._collection.find(
+            filter=filter_dict,
+            sort={"$vector": query_vector},
+            limit=top_k,
+            include_similarity=True,
+            projection=projection,
+        )
+
+        raw_docs = list(cursor)
+        search_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        raw_count = len(raw_docs)
+
+        logger.info(
+            "Astra DB search complete: retrieved=%d  time=%.1fms",
+            raw_count,
+            search_time_ms,
+        )
+
+        # Step 2: Post-filtering — similarity threshold is applied after the top-K candidate retrieval
+        results: list[dict] = []
+        for doc in raw_docs:
+            raw_sim = doc.get("$similarity", 0.0)
+            sim_score = float(raw_sim) if raw_sim is not None else 0.0
+            if similarity_threshold is not None and sim_score < similarity_threshold:
+                logger.debug(
+                    "Skipping candidate chunk '%s' (similarity %.4f < threshold %.4f)",
+                    doc.get("_id"),
+                    sim_score,
+                    similarity_threshold,
+                )
+                continue
+
+            results.append({
+                "chunk_id": doc.get("chunk_id", doc.get("_id")),
+                "document_id": doc.get("document_id", ""),
+                "document_name": doc.get("document_name", ""),
+                "user_id": doc.get("user_id", ""),
+                "text": doc.get("text", ""),
+                "char_count": doc.get("char_count", len(doc.get("text", ""))),
+                "file_type": doc.get("file_type", "unknown"),
+                "page_number": doc.get("page_number"),
+                "slide_number": doc.get("slide_number"),
+                "slide_title": doc.get("slide_title"),
+                "heading": doc.get("heading"),
+                "subject": doc.get("subject"),
+                "topic": doc.get("topic"),
+                "chunk_index": doc.get("chunk_index", 0),
+                "source_type": doc.get("source_type", "document"),
+                "similarity_score": round(sim_score, 4),
+            })
+
+        return results, search_time_ms, raw_count
+
+    # ------------------------------------------------------------------
     # Health & Diagnostics
     # ------------------------------------------------------------------
 
