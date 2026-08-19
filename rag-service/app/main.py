@@ -85,13 +85,37 @@ async def lifespan(app: FastAPI):
         )
         app.state.groq_service = None
 
+    # --- Initialize Retrieval & RAG Orchestration (Tasks 7 & 9) ---
+    from app.services.retrieval_service import RetrievalService
+    from app.services.rag_service import RAGService
+
+    try:
+        retrieval_service = RetrievalService(
+            embedding_service=app.state.embedding_service,
+            astra_service=app.state.astra_db_service,
+        )
+        app.state.retrieval_service = retrieval_service
+
+        rag_service = RAGService(
+            retrieval_service=retrieval_service,
+            groq_service=app.state.groq_service,
+        )
+        app.state.rag_service = rag_service
+        logger.info("RAG orchestration service ready.")
+    except Exception as exc:
+        logger.warning("RAG service initialization failed: %s", exc)
+        app.state.retrieval_service = None
+        app.state.rag_service = None
+
     yield  # App is running
 
     logger.info("Shutting down %s …", settings.APP_NAME)
-    # Release model, DB, and LLM resources
+    # Release model, DB, LLM, and RAG resources
     app.state.embedding_service = None
     app.state.astra_db_service = None
     app.state.groq_service = None
+    app.state.retrieval_service = None
+    app.state.rag_service = None
 
 
 # ---------------------------------------------------------------------------

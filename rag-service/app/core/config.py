@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     MAX_TOP_K: int = 50
     DEFAULT_SIMILARITY_THRESHOLD: Optional[float] = None
 
+    # --- RAG Generation (Task 9) ---
+    RAG_MAX_CONTEXT_CHUNKS: int = 5
+    RAG_MAX_CONTEXT_CHARACTERS: int = 12000
+    RAG_TEMPERATURE: float = 0.2
+    RAG_MAX_COMPLETION_TOKENS: int = 1024
+
 
 # Singleton settings instance — import this everywhere
 settings = Settings()
