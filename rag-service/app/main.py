@@ -68,12 +68,30 @@ async def lifespan(app: FastAPI):
         )
         app.state.astra_db_service = None
 
+    # --- Initialize Groq LLM (Task 8) ---
+    from app.services.groq_service import GroqService
+
+    try:
+        groq_service = GroqService()
+        app.state.groq_service = groq_service
+        if groq_service.is_configured:
+            logger.info("Groq LLM service ready: model=%s", groq_service.model)
+        else:
+            logger.info("Groq LLM service not configured (missing GROQ_API_KEY in .env)")
+    except Exception as exc:
+        logger.warning(
+            "Groq LLM service initialization failed: %s — LLM generation endpoints will be unavailable",
+            exc,
+        )
+        app.state.groq_service = None
+
     yield  # App is running
 
     logger.info("Shutting down %s …", settings.APP_NAME)
-    # Release model and DB resources
+    # Release model, DB, and LLM resources
     app.state.embedding_service = None
     app.state.astra_db_service = None
+    app.state.groq_service = None
 
 
 # ---------------------------------------------------------------------------

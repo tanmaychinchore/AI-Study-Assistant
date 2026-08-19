@@ -36,8 +36,13 @@ class Settings(BaseSettings):
     RAG_SERVICE_HOST: str = "0.0.0.0"
     RAG_SERVICE_PORT: int = 8000
 
-    # --- Groq LLM ---
+    # --- Groq LLM (Task 8) ---
     GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_TEMPERATURE: float = 0.2
+    GROQ_MAX_COMPLETION_TOKENS: int = 1024
+    GROQ_TIMEOUT: float = 30.0
+    GROQ_MAX_RETRIES: int = 2
 
     # --- Astra DB ---
     ASTRA_DB_API_ENDPOINT: str = ""

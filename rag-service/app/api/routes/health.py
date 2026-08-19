@@ -37,6 +37,15 @@ async def health_check(request: Request) -> SuccessResponse:
     else:
         components["astra_db"] = "unavailable"
 
+    # Check Groq LLM service (Task 8)
+    groq_service = getattr(request.app.state, "groq_service", None)
+    if groq_service and groq_service.is_ready:
+        components["llm"] = f"ready (groq/{groq_service.model})"
+    elif groq_service and not groq_service.is_configured:
+        components["llm"] = "not_configured"
+    else:
+        components["llm"] = "unavailable"
+
     health_data = HealthCheckData(
         status="healthy",
         service=settings.APP_NAME,
