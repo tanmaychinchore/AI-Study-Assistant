@@ -27,9 +27,13 @@ sentence-transformers==4.1.0
 # --- Vector Store (Task 5) ---
 astrapy==1.5.2
 
+# --- Conversation & Message Store (Task 10) ---
+pymongo>=4.6.0
+
 # --- LLM Provider (Task 8) ---
 groq>=0.15.0
 
 # --- Testing ---
 pytest==8.4.1
 pytest-asyncio==1.0.0
+mongomock>=4.3.0

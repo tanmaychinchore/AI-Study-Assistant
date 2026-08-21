@@ -107,15 +107,40 @@ async def lifespan(app: FastAPI):
         app.state.retrieval_service = None
         app.state.rag_service = None
 
+    # --- Initialize MongoDB Conversation Store (Task 10) ---
+    from app.services.conversation_service import ConversationService
+
+    try:
+        conversation_service = ConversationService()
+        try:
+            conversation_service.connect()
+            logger.info("Conversation service ready: db=%s", conversation_service.database_name)
+        except Exception as exc:
+            logger.warning(
+                "MongoDB conversation store connection deferred/failed: %s — conversation endpoints will connect on demand",
+                exc,
+            )
+        app.state.conversation_service = conversation_service
+    except Exception as exc:
+        logger.warning("Conversation service initialization failed: %s", exc)
+        app.state.conversation_service = None
+
     yield  # App is running
 
     logger.info("Shutting down %s …", settings.APP_NAME)
-    # Release model, DB, LLM, and RAG resources
+    # Release model, DB, LLM, RAG, and MongoDB resources
+    if getattr(app.state, "conversation_service", None) is not None:
+        try:
+            app.state.conversation_service.close()
+        except Exception:
+            pass
+
     app.state.embedding_service = None
     app.state.astra_db_service = None
     app.state.groq_service = None
     app.state.retrieval_service = None
     app.state.rag_service = None
+    app.state.conversation_service = None
 
 
 # ---------------------------------------------------------------------------

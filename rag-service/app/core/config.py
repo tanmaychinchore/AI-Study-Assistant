@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     RAG_TEMPERATURE: float = 0.2
     RAG_MAX_COMPLETION_TOKENS: int = 1024
 
+    # --- MongoDB Conversation Storage (Task 10) ---
+    MONGODB_URI: str = "mongodb://localhost:27017"
+    MONGODB_DATABASE: str = "ai_study_assistant"
+    MONGODB_CONVERSATIONS_COLLECTION: str = "conversations"
+    MONGODB_MESSAGES_COLLECTION: str = "messages"
+    CHAT_MAX_HISTORY_MESSAGES: int = 10
+
 
 # Singleton settings instance — import this everywhere
 settings = Settings()
