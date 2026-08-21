@@ -90,6 +90,11 @@ class Settings(BaseSettings):
     # --- Upload Hardening (Task 12) ---
     MAX_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50MB
 
+    # --- JWT Authentication (Task 13) ---
+    JWT_SECRET_KEY: str = ""
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
     @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:
@@ -131,6 +136,13 @@ class Settings(BaseSettings):
     def validate_mongo_uri(cls, v: str) -> str:
         if not v or not v.strip() or not (v.startswith("mongodb://") or v.startswith("mongodb+srv://")):
             raise ValueError("MONGODB_URI is missing or invalid")
+        return v.strip()
+
+    @field_validator("JWT_SECRET_KEY")
+    @classmethod
+    def validate_jwt_secret(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("JWT_SECRET_KEY is missing or invalid")
         return v.strip()
 
 

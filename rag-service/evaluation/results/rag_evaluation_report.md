@@ -1,6 +1,6 @@
 # AI Study Assistant — RAG Evaluation Report
 
-**Timestamp (UTC)**: 2026-08-21T20:34:22.565315+00:00
+**Timestamp (UTC)**: 2026-08-21T21:50:01.125117+00:00
 
 ## 1. Summary Metrics
 
@@ -25,8 +25,8 @@
 
 | Phase | Min | Max | Average | P50 (Median) | P95 |
 |---|---|---|---|---|---|
-| **Total End-to-End** | 0.2 | 52.6 | 32.3 | 50.9 | 52.2 |
-| Retrieval | - | - | 0.2 | - | - |
+| **Total End-to-End** | 0.5 | 51.3 | 32.1 | 50.9 | 51.2 |
+| Retrieval | - | - | 0.1 | - | - |
 | Context Building | - | - | 0.0 | - | - |
 | LLM Generation | - | - | 31.2 | - | - |
 

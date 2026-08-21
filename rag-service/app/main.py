@@ -106,10 +106,18 @@ async def lifespan(app: FastAPI):
         )
         app.state.rag_service = rag_service
         logger.info("RAG orchestration service ready.")
+
+        # --- Initialize TutorService (Task 13) ---
+        from app.services.tutor_service import TutorService
+        tutor_service = TutorService(retrieval_service=retrieval_service)
+        app.state.tutor_service = tutor_service
+        logger.info("Smart Tutor foundation service ready.")
+
     except Exception as exc:
         logger.warning("RAG service initialization failed: %s", exc)
         app.state.retrieval_service = None
         app.state.rag_service = None
+        app.state.tutor_service = None
 
     # --- Initialize MongoDB Conversation Store (Task 10) ---
     from app.services.conversation_service import ConversationService
@@ -129,6 +137,24 @@ async def lifespan(app: FastAPI):
         logger.warning("Conversation service initialization failed: %s", exc)
         app.state.conversation_service = None
 
+    # --- Initialize AuthService (Task 13) ---
+    from app.services.auth_service import AuthService
+
+    try:
+        auth_service = AuthService()
+        try:
+            auth_service.connect()
+            logger.info("AuthService database connection ready.")
+        except Exception as exc:
+            logger.warning(
+                "AuthService MongoDB connection failed/deferred: %s",
+                exc,
+            )
+        app.state.auth_service = auth_service
+    except Exception as exc:
+        logger.warning("AuthService initialization failed: %s", exc)
+        app.state.auth_service = None
+
     yield  # App is running
 
     logger.info("Shutting down %s …", settings.APP_NAME)
@@ -136,6 +162,12 @@ async def lifespan(app: FastAPI):
     if getattr(app.state, "conversation_service", None) is not None:
         try:
             app.state.conversation_service.close()
+        except Exception:
+            pass
+
+    if getattr(app.state, "auth_service", None) is not None:
+        try:
+            app.state.auth_service.close()
         except Exception:
             pass
 

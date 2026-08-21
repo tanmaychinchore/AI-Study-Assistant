@@ -8,7 +8,9 @@ Provides endpoints for:
 """
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+
+from app.api.dependencies.auth import get_current_user
 
 from app.core.config import settings
 from app.core.logging import get_logger
@@ -81,7 +83,13 @@ def _get_rag_service(request: Request) -> RAGService:
 async def create_conversation_endpoint(
     request_body: ConversationCreateRequest,
     request: Request,
+    current_user: dict = Depends(get_current_user),
 ) -> SuccessResponse:
+    if request_body.user_id != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client user_id does not match the authenticated identity.",
+        )
     conv_service = _get_conversation_service(request)
 
     try:
@@ -111,7 +119,13 @@ async def list_conversations_endpoint(
     user_id: str = Query(..., min_length=1, description="User ID owning the conversations."),
     limit: int = Query(50, ge=1, le=100, description="Max conversations to return."),
     offset: int = Query(0, ge=0, description="Pagination offset."),
+    current_user: dict = Depends(get_current_user),
 ) -> SuccessResponse:
+    if user_id != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client user_id does not match the authenticated identity.",
+        )
     conv_service = _get_conversation_service(request)
 
     try:
@@ -139,7 +153,13 @@ async def get_conversation_endpoint(
     conversation_id: str,
     request: Request,
     user_id: str = Query(..., min_length=1, description="User ID requesting access."),
+    current_user: dict = Depends(get_current_user),
 ) -> SuccessResponse:
+    if user_id != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client user_id does not match the authenticated identity.",
+        )
     conv_service = _get_conversation_service(request)
 
     try:
@@ -170,7 +190,13 @@ async def delete_conversation_endpoint(
     conversation_id: str,
     request: Request,
     user_id: str = Query(..., min_length=1, description="User ID owning the conversation."),
+    current_user: dict = Depends(get_current_user),
 ) -> SuccessResponse:
+    if user_id != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client user_id does not match the authenticated identity.",
+        )
     conv_service = _get_conversation_service(request)
 
     try:
@@ -206,7 +232,13 @@ async def get_messages_endpoint(
     request: Request,
     user_id: str = Query(..., min_length=1, description="User ID requesting message history."),
     limit: Optional[int] = Query(None, ge=1, le=500, description="Optional maximum message limit."),
+    current_user: dict = Depends(get_current_user),
 ) -> SuccessResponse:
+    if user_id != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client user_id does not match the authenticated identity.",
+        )
     conv_service = _get_conversation_service(request)
 
     try:
@@ -250,7 +282,13 @@ async def conversation_chat_endpoint(
     conversation_id: str,
     request_body: ChatRequest,
     request: Request,
+    current_user: dict = Depends(get_current_user),
 ) -> SuccessResponse:
+    if request_body.user_id != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client user_id does not match the authenticated identity.",
+        )
     conv_service = _get_conversation_service(request)
     rag_service = _get_rag_service(request)
 

@@ -10,7 +10,9 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+
+from app.api.dependencies.auth import get_current_user
 
 from app.core.logging import get_logger
 from app.schemas.document import (
@@ -151,8 +153,14 @@ async def process_document(
     document_id: str = Form(default=None, description="Optional pre-generated document ID."),
     subject: str = Form(default=None, description="Subject label."),
     topic: str = Form(default=None, description="Topic label."),
+    current_user: dict = Depends(get_current_user),
 ) -> SuccessResponse:
     """Upload a document and extract its text and metadata."""
+    if user_id != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client user_id does not match the authenticated identity.",
+        )
     contents, _ = await _validate_and_read_file(file)
 
     tmp_dir = None
@@ -242,8 +250,14 @@ async def process_and_chunk_document(
     document_id: str = Form(default=None, description="Optional pre-generated document ID."),
     subject: str = Form(default=None, description="Subject label."),
     topic: str = Form(default=None, description="Topic label."),
+    current_user: dict = Depends(get_current_user),
 ) -> SuccessResponse:
     """Upload a document and run the full extract → clean → chunk pipeline."""
+    if user_id != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client user_id does not match the authenticated identity.",
+        )
     contents, _ = await _validate_and_read_file(file)
 
     tmp_dir = None
@@ -364,8 +378,14 @@ async def index_document_endpoint(
     document_id: str = Form(default=None, description="Optional pre-generated document ID."),
     subject: str = Form(default=None, description="Subject label."),
     topic: str = Form(default=None, description="Topic label."),
+    current_user: dict = Depends(get_current_user),
 ) -> SuccessResponse:
     """Upload a document and execute the complete 5-stage indexing pipeline."""
+    if user_id != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client user_id does not match the authenticated identity.",
+        )
     contents, _ = await _validate_and_read_file(file)
 
     # Check services availability

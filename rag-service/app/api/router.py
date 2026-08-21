@@ -7,12 +7,14 @@ under the /api/v1 prefix defined in settings.
 
 from fastapi import APIRouter
 
-from app.api.routes import health, documents, embeddings, vector_db, retrieval, llm, rag, conversations
+from app.api.routes import health, documents, embeddings, vector_db, retrieval, llm, rag, conversations, auth, tutor
 
 api_router = APIRouter()
 
 # --- v1 routes ---
 api_router.include_router(health.router)
+api_router.include_router(auth.router)
+api_router.include_router(tutor.router)
 api_router.include_router(documents.router)
 api_router.include_router(embeddings.router)
 api_router.include_router(vector_db.router)

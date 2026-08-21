@@ -33,6 +33,12 @@ pymongo>=4.6.0
 # --- LLM Provider (Task 8) ---
 groq>=0.15.0
 
+# --- Authentication & Hashing (Task 13) ---
+pyjwt==2.10.1
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.0
+email-validator>=2.0.0
+
 # --- Testing ---
 pytest==8.4.1
 pytest-asyncio==1.0.0

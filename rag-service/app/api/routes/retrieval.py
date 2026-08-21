@@ -4,8 +4,9 @@ Retrieval API routes.
 Provides semantic search endpoints for querying indexed study documents.
 """
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from app.api.dependencies.auth import get_current_user
 from app.core.logging import get_logger
 from app.schemas.response import SuccessResponse
 from app.schemas.retrieval import RetrievalRequest, RetrievalResult
@@ -30,10 +31,16 @@ router = APIRouter(prefix="/retrieval", tags=["Retrieval"])
 async def search_retrieval_endpoint(
     request_body: RetrievalRequest,
     request: Request,
+    current_user: dict = Depends(get_current_user),
 ) -> SuccessResponse:
     """
     Execute semantic similarity search for study document chunks.
     """
+    if request_body.user_id != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client user_id does not match the authenticated identity.",
+        )
     # ------------------------------------------------------------------
     # 1. Verify service readiness from application state
     # ------------------------------------------------------------------

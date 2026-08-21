@@ -5,8 +5,9 @@ Provides the end-to-end question answering endpoint that orchestrates
 semantic retrieval, context budgeting, and Groq LLM grounded text generation.
 """
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from app.api.dependencies.auth import get_current_user
 from app.core.logging import get_logger
 from app.schemas.rag import RAGRequest, RAGResult
 from app.schemas.response import SuccessResponse
@@ -37,10 +38,16 @@ router = APIRouter(prefix="/rag", tags=["RAG"])
 async def rag_query_endpoint(
     request_body: RAGRequest,
     request: Request,
+    current_user: dict = Depends(get_current_user),
 ) -> SuccessResponse:
     """
     Execute grounded RAG question answering.
     """
+    if request_body.user_id != current_user["user_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client user_id does not match the authenticated identity.",
+        )
     rag_service = getattr(request.app.state, "rag_service", None)
     if rag_service is None:
         raise HTTPException(
