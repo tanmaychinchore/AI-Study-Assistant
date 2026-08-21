@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     MONGODB_MESSAGES_COLLECTION: str = "messages"
     CHAT_MAX_HISTORY_MESSAGES: int = 10
 
+    # --- RAG Evaluation (Task 11) ---
+    EVAL_MIN_HIT_AT_5: float = 0.70
+    EVAL_MIN_KEYWORD_COVERAGE: float = 0.70
+
 
 # Singleton settings instance — import this everywhere
 settings = Settings()
