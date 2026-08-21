@@ -42,6 +42,26 @@ CHUNK_PREVIEW_COUNT = 5
 # Helpers
 # ---------------------------------------------------------------------------
 
+def verify_magic_bytes(contents: bytes, ext: str) -> None:
+    """
+    Verify file contents match expected file type headers (magic numbers).
+    """
+    if not contents:
+        raise ValueError("Uploaded file is empty.")
+
+    if ext == ".pdf":
+        if not contents.startswith(b"%PDF"):
+            raise ValueError("Invalid PDF file structure.")
+    elif ext in (".pptx", ".docx"):
+        if not contents.startswith(b"PK\x03\x04"):
+            raise ValueError(f"Invalid OOXML file structure for {ext}.")
+    elif ext == ".txt":
+        try:
+            contents.decode("utf-8")
+        except UnicodeDecodeError:
+            raise ValueError("Invalid text file encoding. Must be UTF-8.")
+
+
 async def _validate_and_read_file(file: UploadFile) -> tuple[bytes, str]:
     """Validate the upload and return (contents, extension)."""
     if not file.filename:
@@ -59,6 +79,14 @@ async def _validate_and_read_file(file: UploadFile) -> tuple[bytes, str]:
                 f"Unsupported file type '{file_ext}'. "
                 f"Supported formats: {supported}"
             ),
+        )
+
+    # Prevent large files early using header info if provided
+    content_length = file.headers.get("content-length")
+    if content_length and int(content_length) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File size exceeds maximum allowed size (50 MB).",
         )
 
     try:
@@ -83,6 +111,15 @@ async def _validate_and_read_file(file: UploadFile) -> tuple[bytes, str]:
                 f"File size ({len(contents) / (1024 * 1024):.1f} MB) exceeds "
                 f"maximum allowed size ({MAX_FILE_SIZE_BYTES / (1024 * 1024):.0f} MB)."
             ),
+        )
+
+    # Validate Magic Bytes / File Content Integrity
+    try:
+        verify_magic_bytes(contents, file_ext)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
         )
 
     return contents, file_ext
@@ -121,7 +158,9 @@ async def process_document(
     tmp_dir = None
     try:
         tmp_dir = tempfile.mkdtemp(prefix="rag_extract_")
-        tmp_path = Path(tmp_dir) / file.filename
+        import os
+        safe_filename = os.path.basename(file.filename).replace("..", "")
+        tmp_path = Path(tmp_dir) / safe_filename
         tmp_path.write_bytes(contents)
 
         logger.info(
@@ -210,7 +249,9 @@ async def process_and_chunk_document(
     tmp_dir = None
     try:
         tmp_dir = tempfile.mkdtemp(prefix="rag_pipeline_")
-        tmp_path = Path(tmp_dir) / file.filename
+        import os
+        safe_filename = os.path.basename(file.filename).replace("..", "")
+        tmp_path = Path(tmp_dir) / safe_filename
         tmp_path.write_bytes(contents)
 
         logger.info(
@@ -345,7 +386,9 @@ async def index_document_endpoint(
     tmp_dir = None
     try:
         tmp_dir = tempfile.mkdtemp(prefix="rag_indexing_")
-        tmp_path = Path(tmp_dir) / file.filename
+        import os
+        safe_filename = os.path.basename(file.filename).replace("..", "")
+        tmp_path = Path(tmp_dir) / safe_filename
         tmp_path.write_bytes(contents)
 
         logger.info(

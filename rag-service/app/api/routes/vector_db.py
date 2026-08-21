@@ -30,8 +30,15 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/vector-db", tags=["Vector Database"])
 
 
+from app.core.config import settings
+
 def _get_astra_db_service(request: Request):
     """Retrieve AstraDBService from application state."""
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Development endpoints are disabled in production.",
+        )
     service = getattr(request.app.state, "astra_db_service", None)
     if service is None or not service.is_ready:
         raise HTTPException(

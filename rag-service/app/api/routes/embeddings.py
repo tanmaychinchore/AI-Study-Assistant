@@ -19,8 +19,15 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/embeddings", tags=["Embeddings"])
 
 
+from app.core.config import settings
+
 def _get_embedding_service(request: Request):
     """Retrieve the EmbeddingService from application state."""
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Development endpoints are disabled in production.",
+        )
     service = getattr(request.app.state, "embedding_service", None)
     if service is None or not service.is_loaded:
         raise HTTPException(

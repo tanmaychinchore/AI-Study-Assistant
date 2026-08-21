@@ -5,8 +5,9 @@ All environment variables are loaded from the .env file and validated here.
 Provides a single source of truth for all configurable values across the service.
 """
 
-from typing import Optional
+from typing import Any, Optional
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,6 +32,9 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
+
+    # --- CORS Security ---
+    CORS_ALLOWED_ORIGINS: Any = ["http://localhost:8000", "http://127.0.0.1:8000"]
 
     # --- Server ---
     RAG_SERVICE_HOST: str = "0.0.0.0"
@@ -82,6 +86,52 @@ class Settings(BaseSettings):
     # --- RAG Evaluation (Task 11) ---
     EVAL_MIN_HIT_AT_5: float = 0.70
     EVAL_MIN_KEYWORD_COVERAGE: float = 0.70
+
+    # --- Upload Hardening (Task 12) ---
+    MAX_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50MB
+
+    @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Any) -> list[str]:
+        if isinstance(v, str):
+            return [x.strip() for x in v.split(",") if x.strip()]
+        return v
+
+    @field_validator("GROQ_API_KEY")
+    @classmethod
+    def validate_groq_key(cls, v: str, info) -> str:
+        # Check environment on app startup if needed, or validate formats
+        if not v or not v.strip():
+            raise ValueError("GROQ_API_KEY is missing or invalid")
+        return v.strip()
+
+    @field_validator("ASTRA_DB_API_ENDPOINT")
+    @classmethod
+    def validate_astra_endpoint(cls, v: str) -> str:
+        if not v or not v.strip() or not v.startswith("http"):
+            raise ValueError("ASTRA_DB_API_ENDPOINT is missing or invalid")
+        return v.strip()
+
+    @field_validator("ASTRA_DB_APPLICATION_TOKEN")
+    @classmethod
+    def validate_astra_token(cls, v: str) -> str:
+        if not v or not v.strip() or not v.startswith("AstraCS:"):
+            raise ValueError("ASTRA_DB_APPLICATION_TOKEN is missing or invalid")
+        return v.strip()
+
+    @field_validator("ASTRA_DB_KEYSPACE")
+    @classmethod
+    def validate_astra_keyspace(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("ASTRA_DB_KEYSPACE is missing or invalid")
+        return v.strip()
+
+    @field_validator("MONGODB_URI")
+    @classmethod
+    def validate_mongo_uri(cls, v: str) -> str:
+        if not v or not v.strip() or not (v.startswith("mongodb://") or v.startswith("mongodb+srv://")):
+            raise ValueError("MONGODB_URI is missing or invalid")
+        return v.strip()
 
 
 # Singleton settings instance — import this everywhere

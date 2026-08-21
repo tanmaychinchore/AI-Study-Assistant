@@ -5,15 +5,19 @@ Creates the FastAPI app, configures CORS middleware, registers
 the API router, and sets up startup/shutdown lifecycle events.
 """
 
+import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.exceptions import RequestValidationError
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
-from app.core.logging import get_logger, setup_logging
+from app.core.logging import get_logger, setup_logging, request_id_var
 
 # Initialize logging as early as possible
 setup_logging()
@@ -160,19 +164,84 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 # ---------------------------------------------------------------------------
 # Middleware
 # ---------------------------------------------------------------------------
 
-# CORS — allow the Node.js backend (and dev tools) to reach the service.
-# In production, restrict origins to the actual backend URL.
+class CorrelationIDMiddleware(BaseHTTPMiddleware):
+    """Middleware to inject Request Correlation ID (X-Correlation-ID) into log context and headers."""
+    async def dispatch(self, request: Request, call_next):
+        corr_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
+        token = request_id_var.set(corr_id)
+        request.state.correlation_id = corr_id
+        try:
+            response = await call_next(request)
+            response.headers["X-Correlation-ID"] = corr_id
+            return response
+        finally:
+            request_id_var.reset(token)
+
+app.add_middleware(CorrelationIDMiddleware)
+
+# CORS — allow backend and developer tools. Wildcards restricted if credentials allowed.
+origins = settings.CORS_ALLOWED_ORIGINS
+allow_all = "*" in origins or (len(origins) == 1 and origins[0] == "*")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten in production
-    allow_credentials=True,
+    allow_origins=origins if not allow_all else ["*"],
+    allow_credentials=not allow_all,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Standardized Error Handlers
+# ---------------------------------------------------------------------------
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning("Request validation failed: %s", exc.errors())
+    return JSONResponse(
+        status_code=422,
+        content=jsonable_encoder({
+            "success": False,
+            "message": "Validation error.",
+            "detail": exc.errors(),
+            "data": {"errors": exc.errors()}
+        })
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    logger.warning("HTTP Exception (%d): %s", exc.status_code, exc.detail)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "message": exc.detail,
+            "detail": exc.detail,
+            "data": None
+        }
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled error occurred in request: %s", str(exc))
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "message": "Internal server error occurred.",
+            "detail": "Internal server error occurred.",
+            "data": None
+        }
+    )
+
 
 # ---------------------------------------------------------------------------
 # Routes
